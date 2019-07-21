@@ -8,6 +8,7 @@
 #include <string>
 
 #include <eosforce/assetage.hpp>
+#include <eosforce/global_stat.hpp>
 #include <native.hpp>
 
 namespace eosio {
