@@ -38,14 +38,6 @@ namespace eosio {
       uint64_t primary_key() const { return name; }
    };
 
-   // global_votestate_info some global data to vote state
-   struct [[eosio::table, eosio::contract("eosio.system")]] global_votestate_info {
-      name    stat_name    = eosforce_vote_stat;
-      int64_t total_staked = -1;
-
-      uint64_t primary_key() const { return stat_name.value; }
-   };
-
    struct [[eosio::table, eosio::contract("eosio.system")]] vote_info {
       account_name bpname = 0;
       assetage     voteage;
@@ -129,7 +121,6 @@ namespace eosio {
    typedef eosio::multi_index<"chainstatus"_n, chain_status>          cstatus_table;
    typedef eosio::multi_index<"heartbeat"_n,   heartbeat_info>        hb_table;
    typedef eosio::multi_index<"blackpro"_n,    producer_blacklist>    blackproducer_table;
-   typedef eosio::multi_index<"gvotestat"_n,   global_votestate_info> global_votestate_table;
 
    /**
     * @defgroup system_contract eosio.system
@@ -172,7 +163,7 @@ namespace eosio {
                                    const account_name& bpname );
 
          // imps
-         inline const global_votestate_info get_global_votestate( const uint32_t curr_block_num );
+         inline const int64_t get_global_total_staked( const uint32_t curr_block_num );
          inline void make_global_votestate( const uint32_t curr_block_num );
          inline void on_change_total_staked( const uint32_t curr_block_num, const int64_t& deta );
          inline void heartbeat_imp( const account_name& bpname, const time_point_sec& timestamp );
@@ -256,39 +247,34 @@ namespace eosio {
    }
 
    inline void system_contract::make_global_votestate( const uint32_t curr_block_num ) {
-      get_global_votestate( curr_block_num );
+      get_global_total_staked( curr_block_num );
    }
 
-   inline const global_votestate_info system_contract::get_global_votestate( const uint32_t curr_block_num ) {
-      global_votestate_table votestat( get_self(), get_self().value );
-      const auto it = votestat.find( eosforce_vote_stat.value );
-      if( it == votestat.end() ) {
-         global_votestate_info res;
-
+   inline const int64_t system_contract::get_global_total_staked( const uint32_t curr_block_num ) {
+      eosforce::gsvote res;
+      const auto is_inited = eosforce::get_globalstat<eosforce::gsvote>( get_self(), res );
+      if( !is_inited ) {
          // calculate total staked all of the bps
          int64_t staked_for_all_bps = 0;
          for( const auto& bp : _bps ) {
             staked_for_all_bps += bp.total_staked;
          }
-         res.total_staked = staked_for_all_bps;
 
-         votestat.emplace( eosforce_vote_stat, [&]( global_votestate_info& g ) { 
-            g = res;
+         eosforce::set_globalstat<eosforce::gsvote>( get_self(), [&]( eosforce::gsvote& g ){
+            eosio::print_f("ddd\n");
+            g.total_staked = staked_for_all_bps;
          } );
+         eosio::print_f("dddddd\n");
 
-         return res;
+         return staked_for_all_bps;
       }
 
-      return *it;
+      return res.total_staked;
    }
 
    inline void system_contract::on_change_total_staked( const uint32_t curr_block_num, const int64_t& deta ) {
-      make_global_votestate( curr_block_num );
-      global_votestate_table votestat( get_self(), get_self().value );
-      const auto it = votestat.find( eosforce_vote_stat.value );
-      check( it != votestat.end(), "make_global_votestate failed" );
-
-      votestat.modify( it, name{}, [&]( global_votestate_info& g ) {
+      make_global_votestate( curr_block_num ); // calc if need
+      eosforce::set_globalstat<eosforce::gsvote>( get_self(), [&]( eosforce::gsvote& g ){
          g.total_staked += ( deta / CORE_SYMBOL_PRECISION );
       } );
    }

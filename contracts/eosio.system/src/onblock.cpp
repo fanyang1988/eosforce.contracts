@@ -125,8 +125,7 @@ namespace eosio {
                                      const time_point_sec& current_time_sec ) {
       hb_table hb_tbl( _self, _self.value );
 
-      const auto& global_votestate = get_global_votestate( curr_block_num );
-      const auto& staked_all_bps = global_votestate.total_staked;
+      const auto& staked_all_bps = get_global_total_staked( curr_block_num );
 
       if( staked_all_bps <= 0 ) {
          return;
